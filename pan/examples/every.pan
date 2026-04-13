@@ -3,14 +3,15 @@
 ###
 
 client test:every(
-    id      v_id,
-    char64  v_char64,
-    int8    v_i8,
-    int16   v_i16,
-    int32   v_i32,
-    int64   v_i64,
-    float   v_float,
-    double  v_double,
-    string  v_string,
-    blob    v_blob
+    id      id,
+    char64  char64,
+    int8    i8,
+    int16   i16,
+    int32   i32,
+    int64   i64,
+    float   float,
+    double  double,
+    string  string,
+    blob    blob,
+    bool    bool
 );

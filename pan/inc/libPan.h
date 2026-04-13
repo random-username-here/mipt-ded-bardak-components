@@ -36,7 +36,8 @@ enum PAN_Type {
     PAN_FLOAT,
     PAN_DOUBLE,
     PAN_STRING,
-    PAN_BLOB
+    PAN_BLOB,
+    PAN_BOOL
 };
 
 enum PAN_Side {

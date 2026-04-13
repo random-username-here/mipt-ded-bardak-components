@@ -34,6 +34,8 @@ def gen_everything():
     blob = b'\x00\xff\x00\x88'
     msg += len(blob).to_bytes(2, 'little') + blob
 
+    msg += b'\01' # bool
+
     head = b''
 
     head += b'test\x00\x00\x00\x00'

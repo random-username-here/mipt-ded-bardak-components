@@ -94,6 +94,7 @@ enum TokType
     T_KW_TYP_DOUBLE,
     T_KW_TYP_STRING,
     T_KW_TYP_BLOB,
+    T_KW_TYP_BOOL,
 };
 
 struct Tok
@@ -123,6 +124,7 @@ static struct Keyword l_keywords[] =
     { "double", T_KW_TYP_DOUBLE },
     { "string", T_KW_TYP_STRING },
     { "blob", T_KW_TYP_BLOB },
+    { "bool", T_KW_TYP_BOOL },
 };
 
 static bool l_isSpecial(char ch)
@@ -215,7 +217,7 @@ bool pan_loadDefs(struct PAN *pan, const char *defs)
 
         struct Tok defPrefix;
         defs = l_tokenize(defs, &defPrefix, &line);
-        if (defPrefix.type != T_NAME)
+        if (defPrefix.type < T_NAME) // after T_NAME are names
             return l_synError(&defPrefix, pan, "Message prefix name expected");
 
         defs = l_tokenize(defs, &punct, &line);
@@ -224,7 +226,7 @@ bool pan_loadDefs(struct PAN *pan, const char *defs)
 
         struct Tok defType;
         defs = l_tokenize(defs, &defType, &line);
-        if (defType.type != T_NAME)
+        if (defType.type < T_NAME)
             return l_synError(&defType, pan, "Message type name expected");
 
         defs = l_tokenize(defs, &punct, &line);
@@ -244,7 +246,7 @@ bool pan_loadDefs(struct PAN *pan, const char *defs)
             struct Tok tok;
             char *name = NULL;
             defs = l_tokenize(defs, &tok, &line);
-            if (tok.type == T_NAME) {
+            if (tok.type >= T_NAME) {
                 name = strndup(tok.origin, tok.size);
                 defs = l_tokenize(defs, &tok, &line);
             }
@@ -411,6 +413,7 @@ SIMPLE_BDF(int32, int32_t v, "%d");
 SIMPLE_BDF(int64, int64_t v, "%lld");
 SIMPLE_BDF(float, float v, "%f");
 SIMPLE_BDF(double, double v, "%lf");
+SIMPLE_BDF(bool, int8_t v, "%u");
 
 static size_t l_bdf_bloblike(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label, bool isBlob)
 {
@@ -429,7 +432,7 @@ static size_t l_bdf_bloblike(struct DumpBuf *db, const uint8_t *buf, size_t pos,
         l_db_hexdump(db, buf, pos, len - pos);
         l_db_printf(
             db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY
-            " of length " ESC_YLW "%d " ESC_GRY "= " ESC_RED "[x] Message was cut\n"
+            "of length " ESC_YLW "%d " ESC_GRY "= " ESC_RED "[x] Message was cut\n"
             ESC_RST, name, label, strSize
         );
         return len;
@@ -439,13 +442,13 @@ static size_t l_bdf_bloblike(struct DumpBuf *db, const uint8_t *buf, size_t pos,
     if (isBlob) {
         l_db_printf(
             db, ESC_GRY " -- " ESC_CYN "blob " ESC_RST "%s " ESC_GRY
-            " of length " ESC_YLW "%d " ESC_RST "\n"
+            "of length " ESC_YLW "%d " ESC_RST "\n"
             ESC_RST, label, strSize 
         );
     } else {
         l_db_printf(
             db, ESC_GRY " -- " ESC_CYN "string " ESC_RST "%s " ESC_GRY
-            " of length " ESC_YLW "%d " ESC_GRY "= " ESC_GRN "`%.*s`\n"
+            "of length " ESC_YLW "%d " ESC_GRY "= " ESC_GRN "`%.*s`\n"
             ESC_RST, label, strSize, strSize, buf + pos + 2
         );
     }
@@ -474,7 +477,8 @@ BinDumpFunc bdf[] = {
     [PAN_FLOAT] = l_bdf_float,
     [PAN_DOUBLE] = l_bdf_double,
     [PAN_STRING] = l_bdf_string,
-    [PAN_BLOB] = l_bdf_blob
+    [PAN_BLOB] = l_bdf_blob,
+    [PAN_BOOL] = l_bdf_bool,
 };
 
 struct __attribute__((packed)) BinMsgHeader {
