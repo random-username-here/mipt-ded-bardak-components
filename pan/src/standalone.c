@@ -1,4 +1,4 @@
-#include "libPan.h"
+#include "libpan.h"
 #include <errno.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -7,22 +7,28 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <unistd.h>
 
 static void l_help(const char *exec)
 {
     puts("");
-    printf("Usage: %s [client|server] FILES\n", exec);
-    puts("Parse binmsg & textmsg dumps");
+    printf("Usage: %s [OPTIONS]... [FILES]...\n", exec);
+    puts("Parse binmsg & textmsg dumps, generate headers");
     puts("");
     puts("Action is determined by filetype:");
-    puts(" - dir    -- will search for .pan files there");
-    puts(" - .pan   -- protocol defenitions will be loaded");
-    puts(" - .bmsg  -- binmsg dump will be processed and dumped");
-    puts(" - .tmsg  -- (TODO) textmsg dump will also be processed and dumped");
-    puts("Side name can be arbitrary prefix of them, for example `c` and `s` will suffice");
+    puts("    dir       will search for .pan files there");
+    puts("    .pan      protocol defenitions will be loaded");
+    puts("    .bmsg     binmsg PRIVATEdump will be processed and dumped");
+    puts("    .h, .hpp  will write header with all currently loaded message types");
+    puts("");
+    puts("Options are:");
+    puts("    -h        Prints this help message");
+    puts("    -c        .bmsg dumps are assumed to be from client");
+    puts("    -s        .bmsg dumps are assumed to be from server");
+    puts("    -i INC    .h files will include that file for macros");
     puts("");
     puts("2026, (c) Ivan Didyk, github.com/random-username-here");
-    puts("Standards for binmsg & textmsg availiable at github.com/random-username-here/mipt-ded-bardak");
+    puts("Standard for binmsg availiable at github.com/random-username-here/mipt-ded-bardak");
     puts("");
 }
 
@@ -68,18 +74,24 @@ static char *l_readFile(const char *name, size_t *r_size)
     return buf;
 }
 
-static void l_process(const char *name, struct PAN *pan, enum PAN_Side side, bool isTop)
+static void l_process(const char *name, struct PAN *pan, enum PAN_Side side, bool isTop, const char *headpath)
 {
-    struct stat st;
-    stat(name, &st);
-
+    struct stat st = {0};
+    if (stat(name, &st) != 0) {
+        if ((l_hasExt(name, ".h") || l_hasExt(name, ".hpp")) && errno == ENOENT) {
+            // we are generating header, it may not exist yet
+            goto header;
+        } else {
+            printf("[x] Failed to stat %s: %s\n", name, strerror(errno));
+            return;
+        }
+    }
     if (S_ISDIR(st.st_mode)) {
         // TODO
     } else if (!S_ISREG(st.st_mode)) {
         if (isTop)
-            printf("[x] File %s is of unknown type", name);
+            printf("[x] File %s is of unknown type\n", name);
     } else if (l_hasExt(name, ".pan")) {
-        puts("");
         printf("Loading defs from %s\n", name);
         bool ok = pan_loadDefsFromFile(pan, name);
         if (!ok) {
@@ -87,8 +99,9 @@ static void l_process(const char *name, struct PAN *pan, enum PAN_Side side, boo
         } else {
             puts("Defs loaded");
         }
+    } else if (!isTop) {
+        // skip
     } else if (l_hasExt(name, ".bmsg")) {
-        puts("");
         printf("Dumping binmsg from %s\n", name);
         size_t fsz = 0;
         char *buf = l_readFile(name, &fsz);
@@ -101,12 +114,21 @@ static void l_process(const char *name, struct PAN *pan, enum PAN_Side side, boo
         while (pos < fsz)
             pos += pan_binDump(pan, side, buf + pos, fsz - pos);
         free(buf);
+    } else if (l_hasExt(name, ".h") || l_hasExt(name, ".hpp")) {
+    header:
+        printf("Writting header to %s\n", name);
+        FILE *output = fopen(name, "w");
+        if (!output) {
+            perror("Failed to open header for writting");
+            return;
+        }
+        pan_generateHeader(pan, output, headpath);
     } else {
         printf("[x] Program doesn't know what to do with %s\n", strerror(errno));
     }
 }
 
-int main(int argc, const char *argv[])
+int main(int argc, char *argv[])
 {
     if (argc < 2) {
         l_help(argv[0]);
@@ -116,19 +138,33 @@ int main(int argc, const char *argv[])
     struct PAN pan;
     pan_init(&pan, l_logger, true);
 
-    enum PAN_Side side;
+    enum PAN_Side side = PAN_CLIENT;
+    const char *header = "libpan_cxx_macros.hpp";
 
-    if (argv[1][0] != '\0' && strncmp(argv[1], "client", strlen(argv[1])) == 0)
-        side = PAN_CLIENT;
-    else if (argv[1][0] != '\0' && strncmp(argv[1], "server", strlen(argv[1])) == 0)
-        side = PAN_SERVER;
-    else {
-        printf("Unknown side: `%s`", argv[1]);
-        return -1;
+    int opt;
+    while ((opt = getopt(argc, argv, "hcsi:")) != -1) {
+        switch (opt) {
+            case 'h':
+                l_help(argv[0]);
+                return 0;
+            case 'c':
+                side = PAN_CLIENT;
+                break;
+            case 's':
+                side = PAN_SERVER;
+                break;
+            case 'i':
+                header = optarg;
+                break;
+            default:
+                printf("Unknown argument `%c`!\n", opt);
+                printf("Known arguments are: -h, -c, -s, -i INCPATH\n");
+                return 1;
+        }
     }
 
-    for (size_t i = 2; i < argc; ++i)
-        l_process(argv[i], &pan, side, true);
+    for (size_t i = optind; i < argc; ++i)
+        l_process(argv[i], &pan, side, true, header);
 
     pan_destroy(&pan);
     return 0;

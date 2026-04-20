@@ -16,6 +16,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -85,6 +86,9 @@ struct PAN_MsgType *pan_binMatch(struct PAN *pan, enum PAN_Side side, const void
 
 /** Print message to some form of output, returns number of bytes taken (in case there are multiple messages in sequence). */
 size_t pan_binDump(struct PAN *pan, enum PAN_Side side, const void *msg, size_t len);
+
+/** Generate header for all loaded message types. You can run `pan examples/every.pan every.h` to see how resulting file will look. */
+void pan_generateHeader(struct PAN *pan, FILE *output, const char *incpath);
 
 /** Free protocol analyzer's structure */
 void pan_destroy(struct PAN *pan);
