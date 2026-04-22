@@ -693,12 +693,14 @@ void pan_generateHeader(struct PAN *pan, FILE *output, const char *incpath)
         l_makeIdentifier(pbuf);
         l_makeIdentifier(tbuf);
 
-        fprintf(output, "PAN_GH_MSG(PAN_GH_CLIENT, %s, %s, \"%s\", \"%s\",\n", pbuf, tbuf, m->prefix, m->type);
+        const char *loc = m->side == PAN_CLIENT ? "PAN_GH_CLIENT" : "PAN_GH_SERVER";
+
+        fprintf(output, "PAN_GH_MSG(%s, %s, %s, \"%s\", \"%s\",\n", loc, pbuf, tbuf, m->prefix, m->type);
         for (struct PAN_Arg *a = m->firstArg; a != NULL; a = a->next)
             fprintf(output, "    %-16s %s;\n", l_mapTypeToC(a->type), a->name);
         fprintf(output, ")\n");
 
-        fprintf(output, "PAN_GH_DECODE(PAN_GH_CLIENT, %s, %s, \"%s\", \"%s\",\n", pbuf, tbuf, m->prefix, m->type);
+        fprintf(output, "PAN_GH_DECODE(%s, %s, %s, \"%s\", \"%s\",\n", loc, pbuf, tbuf, m->prefix, m->type);
         for (struct PAN_Arg *a = m->firstArg; a != NULL; a = a->next) {
             if (a->type == PAN_BLOB || a->type == PAN_STRING) {
                 fprintf(output, "    uint16_t %s_len = 0;\n", a->name);
@@ -710,7 +712,7 @@ void pan_generateHeader(struct PAN *pan, FILE *output, const char *incpath)
         }
         fprintf(output, ")\n");
 
-        fprintf(output, "PAN_GH_ENCODE(PAN_GH_CLIENT, %s, %s, \"%s\", \"%s\",\n", pbuf, tbuf, m->prefix, m->type);
+        fprintf(output, "PAN_GH_ENCODE(%s, %s, %s, \"%s\", \"%s\",\n", loc, pbuf, tbuf, m->prefix, m->type);
         fprintf(output, "    uint16_t len = 0;\n");
         for (struct PAN_Arg *a = m->firstArg; a != NULL; a = a->next) {
             if (a->type == PAN_BLOB || a->type == PAN_STRING)

@@ -95,11 +95,11 @@ void Server::m_srvMessage(Client *cl, bmsg::RawMessage msg) {
 }
 
 void Server::m_onConnect(Client *cl) {
-    cl->send(bmsg::CL_srv_name {m_name});
-    cl->send(bmsg::CL_srv_id {(uint32_t) cl->m_id});
-    cl->send(bmsg::CL_srv_level { "player" });
+    cl->send(bmsg::SV_srv_name {m_name});
+    cl->send(bmsg::SV_srv_id {(uint32_t) cl->m_id});
+    cl->send(bmsg::SV_srv_level { "player" });
     for (auto [pref, mod] : m_prefMapping)
-        cl->send(bmsg::CL_srv_hasPref { pref });
+        cl->send(bmsg::SV_srv_hasPref { pref });
 
     for (auto i : m_plugins)
         i->onConnect(cl);
