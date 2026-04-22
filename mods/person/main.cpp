@@ -119,3 +119,7 @@ class PersonCtl : public BmServerModule {
         }
     }
 };
+
+extern "C" Mod *modlib_create(ModManager *mm) {
+    return new PersonCtl();
+}
