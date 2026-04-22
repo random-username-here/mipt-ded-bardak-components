@@ -1,12 +1,12 @@
 #include <stdexcept>
 #include <random>
-#include "../timer.h"
+#include "../timer.hpp"
 
 
 std::string_view 
 Timer::id () const
 {
-    return "TimerManager";
+    return "DoDoeb.timer_mngr";
 }
 
 std::string_view 
