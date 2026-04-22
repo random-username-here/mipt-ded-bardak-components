@@ -393,19 +393,27 @@ static void l_db_hexdump(struct DumpBuf *db, const uint8_t *data, size_t from, s
             l_db_printf(db, ESC_GRY ".. " ESC_RST);
 }
 
-typedef size_t (*BinDumpFunc)(struct DumpBuf *dbuf, const uint8_t *buf, size_t pos, size_t len, const char *label);
+typedef size_t (*BinDumpFunc)(struct DumpBuf *dbuf, const uint8_t *buf, size_t pos, size_t len, const char *label, bool longform);
 
 #define SIMPLE_BDF(name, type, spec)\
-    static size_t l_bdf_##name(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label) {\
+    static size_t l_bdf_##name(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label, bool lform) {\
         type;\
         if (len < pos + sizeof(typeof(v))) {\
-            l_db_hexdump(db, buf, pos, len - pos);\
-            l_db_printf(db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY "= " ESC_RED "[x] Message was cut\n" ESC_RST, #name, label);\
+            if (lform) {\
+                l_db_hexdump(db, buf, pos, len - pos);\
+                l_db_printf(db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY "= " ESC_RED "[x] Message was cut\n" ESC_RST, #name, label);\
+            } else {\
+                l_db_printf(db, "%s " ESC_GRY "= " ESC_RED "[cut]" ESC_RST, label);\
+            }\
             return len;\
         }\
         memcpy(&v, buf + pos, sizeof(typeof(v)));\
-        l_db_hexdump(db, buf, pos, sizeof(typeof(v)));\
-        l_db_printf(db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY "= " ESC_YLW spec ESC_RST "\n", #name, label, v);\
+        if (lform) {\
+            l_db_hexdump(db, buf, pos, sizeof(typeof(v)));\
+            l_db_printf(db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY "= " ESC_YLW spec ESC_RST "\n", #name, label, v);\
+        } else {\
+            l_db_printf(db, "%s " ESC_GRY "= " ESC_YLW spec ESC_RST, label, v);\
+        }\
         return pos + sizeof(typeof(v));\
     }
 
@@ -419,54 +427,73 @@ SIMPLE_BDF(float, float v, "%f");
 SIMPLE_BDF(double, double v, "%lf");
 SIMPLE_BDF(bool, int8_t v, "%u");
 
-static size_t l_bdf_bloblike(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label, bool isBlob)
+static size_t l_bdf_bloblike(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label, bool lform, bool isBlob)
 {
     const char *name = isBlob ? "blob" : "string";
     if (len < pos + 2) {
-        l_db_hexdump(db, buf, pos, len - pos);
-        l_db_printf(
-            db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY
-            "= " ESC_RED "[x] Message was cut\n" ESC_RST, name, label
-        );
+        if (lform) {
+            l_db_hexdump(db, buf, pos, len - pos);
+            l_db_printf(
+                db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY
+                "= " ESC_RED "[x] Message was cut\n" ESC_RST, name, label
+            );
+        } else {
+            l_db_printf(db, "%s " ESC_GRY " = " ESC_RED "[cut]" ESC_RST, label);
+        }
         return len;
     }
     uint16_t strSize;
     memcpy(&strSize, buf + pos, 2);
     if (len < pos + 2 + strSize) {
-        l_db_hexdump(db, buf, pos, len - pos);
-        l_db_printf(
-            db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY
-            "of length " ESC_YLW "%d " ESC_GRY "= " ESC_RED "[x] Message was cut\n"
-            ESC_RST, name, label, strSize
-        );
+        if (lform) {
+            l_db_hexdump(db, buf, pos, len - pos);
+            l_db_printf(
+                db, ESC_GRY " -- " ESC_CYN "%s " ESC_RST "%s " ESC_GRY
+                "of length " ESC_YLW "%d " ESC_GRY "= " ESC_RED "[x] Message was cut\n"
+                ESC_RST, name, label, strSize
+            );
+        } else {
+            l_db_printf(db, "%s" ESC_GRY " = " ESC_RED "[cut]" ESC_RST, label);
+        }
         return len;
     }
 
-    l_db_hexdump(db, buf, pos, 2 + strSize);
-    if (isBlob) {
-        l_db_printf(
-            db, ESC_GRY " -- " ESC_CYN "blob " ESC_RST "%s " ESC_GRY
-            "of length " ESC_YLW "%d " ESC_RST "\n"
-            ESC_RST, label, strSize 
-        );
+    if (lform) {
+        l_db_hexdump(db, buf, pos, 2 + strSize);
+        if (isBlob) {
+            l_db_printf(
+                db, ESC_GRY " -- " ESC_CYN "blob " ESC_RST "%s " ESC_GRY
+                "of length " ESC_YLW "%d " ESC_RST "\n"
+                ESC_RST, label, strSize 
+            );
+        } else {
+            l_db_printf(
+                db, ESC_GRY " -- " ESC_CYN "string " ESC_RST "%s " ESC_GRY
+                "of length " ESC_YLW "%d " ESC_GRY "= " ESC_GRN "`%.*s`\n"
+                ESC_RST, label, strSize, strSize, buf + pos + 2
+            );
+        }
     } else {
-        l_db_printf(
-            db, ESC_GRY " -- " ESC_CYN "string " ESC_RST "%s " ESC_GRY
-            "of length " ESC_YLW "%d " ESC_GRY "= " ESC_GRN "`%.*s`\n"
-            ESC_RST, label, strSize, strSize, buf + pos + 2
-        );
+        l_db_printf(db, "%s " ESC_GRY "= " ESC_RST, label);
+        if (isBlob)
+            l_db_printf(db, "blob[" ESC_YLW "%u" ESC_RST "]", strSize);
+        else {
+            uint16_t pl = strSize;
+            if (pl > 32) pl = 32;
+            l_db_printf(db, ESC_GRN "`%.*s%s" ESC_RST, pl, buf + pos + 2, (pl == strSize ? "`" : "`..."));
+        }
     }
     return pos + 2 + strSize;
 }
 
-static size_t l_bdf_string(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label)
+static size_t l_bdf_string(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label, bool lform)
 {
-   return l_bdf_bloblike(db, buf, pos, len, label, false);
+   return l_bdf_bloblike(db, buf, pos, len, label, lform, false);
 }
 
-static size_t l_bdf_blob(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label)
+static size_t l_bdf_blob(struct DumpBuf *db, const uint8_t *buf, size_t pos, size_t len, const char *label, bool lform)
 {
-   return l_bdf_bloblike(db, buf, pos, len, label, true);
+   return l_bdf_bloblike(db, buf, pos, len, label, lform, true);
 }
 
 #undef SIMPLE_BDF
@@ -492,7 +519,6 @@ struct __attribute__((packed)) BinMsgHeader {
     uint16_t bodyLen;
     uint16_t flags;
 };
-
 
 size_t pan_binDump(struct PAN *pan, enum PAN_Side side, const void *msg, size_t len)
 {
@@ -548,7 +574,7 @@ size_t pan_binDump(struct PAN *pan, enum PAN_Side side, const void *msg, size_t 
 
     struct PAN_Arg *arg = type->firstArg;
     while (arg != NULL) {
-        pos = bdf[arg->type](&db, cptr, pos, len, arg->name ? arg->name : "<no name>");
+        pos = bdf[arg->type](&db, cptr, pos, len, arg->name ? arg->name : "<no name>", true);
         arg = arg->next;
     }
     size_t realBodyLen = pos - sizeof(struct BinMsgHeader);
@@ -569,6 +595,53 @@ end:
     free(db.buf);
     return pos;
 }
+
+size_t pan_binDump_short(struct PAN *pan, enum PAN_Side side, const void *msg, size_t len)
+{
+    const uint8_t *cptr = (const uint8_t*) msg;
+
+    struct DumpBuf db = {0};
+    if (len < sizeof(struct BinMsgHeader)) {
+        l_db_printf(&db, ESC_RED "partial message" ESC_RST);
+        goto end;
+    }
+
+    struct BinMsgHeader header;
+    memcpy(&header, cptr, sizeof(header));
+    l_db_printf(
+        &db, ESC_BLU "%.8s " ESC_GRN "%s" ESC_GRY ":" ESC_RST "%.8s " ESC_YLW
+        "#%zu " ESC_GRY "len = " ESC_YLW "%zu " ESC_GRY "(" ESC_RST,
+        side == PAN_CLIENT ? "client" : "server", header.pref,
+        header.type, header.seq, header.bodyLen
+    );
+
+    size_t pos = sizeof(struct BinMsgHeader);
+    struct PAN_MsgType *type = pan_binMatch(pan, side, msg, len);
+
+    if (!type) {
+        l_db_printf(&db, ESC_RED "unknown type" ESC_GRY ")");
+        goto end;
+    }
+
+    struct PAN_Arg *arg = type->firstArg;
+    while (arg != NULL) {
+        pos = bdf[arg->type](&db, cptr, pos, len, arg->name ? arg->name : "<no name>", false);
+        if (arg->next)
+            l_db_printf(&db, ESC_GRY ", " ESC_RST);
+        arg = arg->next;
+    }
+
+    l_db_printf(&db, ESC_GRY ")");
+
+end:
+    if (!pan->color)
+        l_db_killColor(&db);
+    pan->logger("%s", db.buf);
+    free(db.buf);
+    return pos;
+
+}
+
 
 //==============================================================================
 // Header generation

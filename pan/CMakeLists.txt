@@ -17,11 +17,14 @@ target_link_libraries(libpan_cxx_macros INTERFACE binmsg)
 
 # Compilation of examples/add.hpp
 
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/examples/add.hpp
-    COMMAND $<TARGET_FILE:pan> ${CMAKE_CURRENT_SOURCE_DIR}/examples/add.pan ${CMAKE_CURRENT_SOURCE_DIR}/examples/add.hpp
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/examples/add.pan pan
-)
+function(pan_header source header)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${header}
+        COMMAND $<TARGET_FILE:pan> ${CMAKE_CURRENT_SOURCE_DIR}/${source} ${CMAKE_CURRENT_SOURCE_DIR}/${header}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source} pan
+    )
+endfunction()
 
+pan_header(examples/add.pan examples/add.hpp)
 add_executable(libpan-demo examples/add.hpp examples/add.cpp)
 target_link_libraries(libpan-demo PRIVATE libpan_cxx_macros)

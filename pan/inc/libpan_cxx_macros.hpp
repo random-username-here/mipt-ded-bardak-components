@@ -39,7 +39,7 @@
         Header header;\
         \
         static std::optional<PAN_GH_NAME(loc, ipref, itype)> decode(RawMessage msg);\
-        void encode(std::ostream &str, Id id, uint16_t flags);\
+        void encode(std::ostream &str, Id id, uint16_t flags) const;\
     };
 
 #define PAN_GH_DECODE_I(type, ...)\
@@ -73,8 +73,8 @@
     PAN_GH_DECODE_I(PAN_GH_NAME(loc, ipref, itype), __VA_ARGS__)
 
 #define PAN_GH_ENCODE_I(type, spref, stype, ...)\
-    inline void type::encode(std::ostream &_os, Id _id, uint16_t _flags) {\
-        type* self = this;\
+    inline void type::encode(std::ostream &_os, Id _id, uint16_t _flags) const {\
+        const type* self = this;\
         __VA_ARGS__\
     }
 
@@ -84,7 +84,7 @@
     } while (0)
 #define PAN_GH_WRITE(buf, count) _os.write((const char*) buf, count)
 #define PAN_GH_SLICE_LEN(ref) ((ref)->size())
-#define PAN_GH_WRITE_SLICE(ref, size) _os.write(ref->data(), ref->size())
+#define PAN_GH_WRITE_SLICE(ref, _) _os.write((ref)->data(), (ref)->size())
 
 #define PAN_GH_ENCODE(loc, ipref, itype, spref, stype, ...)\
     PAN_GH_ENCODE_I(PAN_GH_NAME(loc, ipref, itype), spref, stype, __VA_ARGS__)

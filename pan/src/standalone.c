@@ -26,6 +26,7 @@ static void l_help(const char *exec)
     puts("    -c        .bmsg dumps are assumed to be from client");
     puts("    -s        .bmsg dumps are assumed to be from server");
     puts("    -i INC    .h files will include that file for macros");
+    puts("    -l        Single-line dump outputs");
     puts("");
     puts("2026, (c) Ivan Didyk, github.com/random-username-here");
     puts("Standard for binmsg availiable at github.com/random-username-here/mipt-ded-bardak");
@@ -74,7 +75,7 @@ static char *l_readFile(const char *name, size_t *r_size)
     return buf;
 }
 
-static void l_process(const char *name, struct PAN *pan, enum PAN_Side side, bool isTop, const char *headpath)
+static void l_process(const char *name, struct PAN *pan, enum PAN_Side side, bool isTop, const char *headpath, bool oneline)
 {
     struct stat st = {0};
     if (stat(name, &st) != 0) {
@@ -111,8 +112,8 @@ static void l_process(const char *name, struct PAN *pan, enum PAN_Side side, boo
         }
         puts("");
         size_t pos = 0;
-        while (pos < fsz)
-            pos += pan_binDump(pan, side, buf + pos, fsz - pos);
+        while (pos < fsz) 
+            pos += (oneline ? pan_binDump_short : pan_binDump)(pan, side, buf + pos, fsz - pos);
         free(buf);
     } else if (l_hasExt(name, ".h") || l_hasExt(name, ".hpp")) {
     header:
@@ -140,9 +141,10 @@ int main(int argc, char *argv[])
 
     enum PAN_Side side = PAN_CLIENT;
     const char *header = "libpan_cxx_macros.hpp";
+    bool oneline = false;
 
     int opt;
-    while ((opt = getopt(argc, argv, "hcsi:")) != -1) {
+    while ((opt = getopt(argc, argv, "hcsli:")) != -1) {
         switch (opt) {
             case 'h':
                 l_help(argv[0]);
@@ -156,6 +158,9 @@ int main(int argc, char *argv[])
             case 'i':
                 header = optarg;
                 break;
+            case 'l':
+                oneline = true;
+                break;
             default:
                 printf("Unknown argument `%c`!\n", opt);
                 printf("Known arguments are: -h, -c, -s, -i INCPATH\n");
@@ -164,7 +169,7 @@ int main(int argc, char *argv[])
     }
 
     for (size_t i = optind; i < argc; ++i)
-        l_process(argv[i], &pan, side, true, header);
+        l_process(argv[i], &pan, side, true, header, oneline);
 
     pan_destroy(&pan);
     return 0;
